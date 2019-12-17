@@ -1,0 +1,253 @@
+﻿<!DOCTYPE html>
+
+<html>
+<head>
+    <meta name="ViewPort" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>@ViewBag.Title</title>
+
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.2/css/all.css" />
+    <link rel="stylesheet" href="@Url.Content("~/Content/EttvTemplate/")css/style.css" />
+
+    @*<link href="https://unpkg.com/video.js/dist/video-js.min.css" rel="stylesheet">*@
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/video.js/7.3.0/video-js.min.css" rel="stylesheet">
+
+    @*<link href="https://vjs.zencdn.net/5.20.1/video-js.css" rel="stylesheet">*@
+    <style>
+        #progressBar {
+            width: 660px;
+            height: 6px;
+            background-color: var(--primary-color);
+            display: none;
+            margin-top: 1px;
+        }
+
+            #progressBar div {
+                height: 100%;
+                width: 0;
+                background-color: var(--light-color);
+            }
+    </style>
+</head>
+<body>
+
+    @RenderPage("~/Views/Shared/_Header.cshtml")
+
+    <div>
+        @RenderBody()
+    </div>
+
+    @RenderPage("~/Views/Shared/_Footer.cshtml")
+
+    @Scripts.Render("~/bundles/jquery")
+    @Scripts.Render("~/bundles/bootstrap")
+    @RenderSection("scripts", required: false)
+
+    <script src="@Url.Content("~/Content/EttvTemplate/")js/index.js"></script>
+    @*<script src="@Url.Content("~/Content/EttvTemplate/")js/YTPlayer.js"></script>*@
+
+
+    @*<script src="https://unpkg.com/video.js/dist/video.min.js"></script>*@
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/video.js/7.3.0/video.min.js"></script>
+    @*<script src='https://vjs.zencdn.net/5.20.1/video.js'></script>*@
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-youtube/2.6.0/Youtube.js"></script>
+    @*vimeo.min.js is not video js, is just an api from vimeo*@
+    <script src="~/Content/EttvTemplate/videojs-vimeo.min.js"></script>
+
+    <script>
+        var seekToTime;
+        var myVideoId, myVideo;
+        var futureVideoList = [];
+        var remainTimeToNextVideo;
+        var result = [];
+
+        function myAjax() {
+            $.ajax({
+                type: "POST",
+                //url: "/Home/GetIndexContentJsonResult",
+                url: '@Url.Action("GetIndexContentJsonResult","Home")',
+                dataType: 'json',
+                data: '{now:' + Date.now() + '}',
+                contentType: "application/json; charset=utf-8",
+                success: function (data) {
+                    //console.log(data)
+                    //console.log(data[0]["VideoContent"]["VideoId"]);
+                    //console.log(moment(data[0]["EndTime"]) - moment(data[0]["StartTime"]));
+                    for (var i = 0; i < data.length; i++) {
+                        result.push({
+                            videoId: data[i]["VideoContent"]["VideoId"],
+                            title: data[i]["VideoContent"]["Title"],
+                            duration: data[i]["VideoContent"]["Duration"],
+                            srcUri: data[i]["VideoContent"]["SrcUri"],
+                            srcExtention: data[i]["VideoContent"]["SrcExtention"],
+                            startTime: moment(data[i]["StartTime"]).add(-(moment(data[i]["StartTime"]).utcOffset()), 'm'), //moment.parseZone((moment(data[i]["StartTime"]).add(-(moment().utcOffset()), 'm'))).utc()/*.utcOffset('+1000')*/.format(),
+                            endTime: moment(data[i]["EndTime"]).add(-(moment(data[i]["EndTime"]).utcOffset()), 'm')//moment.parseZone((moment(data[i]["EndTime"]).add(-(moment().utcOffset()),'m'))).utc()/*.utcOffset('+1000')*/.format()
+                        });
+                    }
+                }
+            });
+        }
+        console.log(result);
+
+        function millisToMinutesAndSeconds(duration) {
+            seconds = Math.floor((duration / 1000) % 60),
+                minutes = Math.floor((duration / (1000 * 60)) % 60),
+                hours = Math.floor((duration / (1000 * 60 * 60)) % 24);
+
+            hours = (hours < 10) ? "0" + hours : hours;
+            minutes = (minutes < 10) ? "0" + minutes : minutes;
+            seconds = (seconds < 10) ? "0" + seconds : seconds;
+
+            return hours + ":" + minutes + ":" + seconds;
+        }
+
+
+        $(function () {
+            myAjax();
+            $(document).ajaxSuccess(function () {
+                findVIdSeekTo();
+                console.log(result);
+                //findVIdSeekTo();
+                var ms = futureVideoList[0];
+                if (myVideoId == undefined && ms > 0) {
+                    var st = setInterval(function () { ms -= 1000; }, 1000);
+                    var runn = setInterval(function () { $('div#remainingTime').text("Remaining Time for Next Program : " + millisToMinutesAndSeconds(ms)); }, 1000);
+                }
+                // refresh when time for the first next video is arrived
+                var timeremainingForFirstNextVideo = futureVideoList[0];
+                if (timeremainingForFirstNextVideo > 0) { setTimeout(function () { location.reload(); }, ms); }
+                myVideo = videojs("vid1");
+
+                loadVideo();
+                myVideo.on('ended', function () {
+                    findVIdSeekTo();
+                    myVideo.src(
+                        {
+                            "techOrder": [ext],
+                            "type": "video/" + ext,
+                            "src": srcUri + myVideoId,
+                        }
+                    );
+
+                    var bim = parseInt(seekToTime / 1000);
+                    if (bim >= 0)
+                        myVideo.currentTime(bim);
+                    myVideo.play();
+                    //myVideo.load();
+                });
+            });
+
+
+        }); // jQuery(function($) END
+
+
+        var width = $(window).width();
+        if (width < 700) {
+            playerWidth = 400;
+            playerHeight = 250;
+        } else {
+            playerWidth = 660;
+            playerHeight = 350;
+        }
+        $(window).resize(function () {
+            if ($(window).width() != width) {
+                if ($(window).width() < 700) {
+                    playerWidth = 400;
+                    playerHeight = 250;
+                } else {
+                    playerWidth = 660;
+                    playerHeight = 350;
+                }
+            }
+            loadVideo();
+        });
+
+        var ext;// = "youtube";
+        var srcUri;
+        var poster = 'https://i.cbc.ca/1.4734813.1557524152!/fileImage/httpImage/image.jpg_gen/derivatives/16x9_780/afp-1768eq.jpg';
+        var playerWidth, playerHeight;
+        function loadVideo() {
+
+            if (ext === "vimeo") {
+               
+                document.getElementById('divId').innerHTML = '<iframe src="//player.vimeo.com/video/' + myVideoId + '?autoplay=1#t=' + parseInt(seekToTime / 1000) +
+                    ' title=1&amp;byline=1&amp;portrait=1" width="' + playerWidth + '" height="' + playerHeight + '" frameborder="0" allow="autoplay" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>';
+
+                var iframe = document.querySelector('iframe');
+                var player = new Vimeo.Player(iframe, { controls: 0 });
+
+                player.on('play', function () {
+                    console.log('Played the video', playerWidth, playerHeight);
+                });
+
+                player.getVideoTitle().then(function (title) {
+                    console.log('title:', title);
+                });
+                //TODO player.ended
+                //TODO try to load without iframe here
+                player.on('ended', function () {
+                    findVIdSeekTo();
+                    loadVideo();
+                });
+
+            }
+
+            myVideo.src(
+                {
+                    "techOrder": ['youtube'],
+                    "type": "video/youtube",
+                    "src": srcUri + myVideoId,
+                    "youtube" : { "iv_load_policy": 3 },
+                    "fluid": true
+                }
+            );
+            if (poster) myVideo.poster(poster);
+            myVideo.on('loadedmetadata', function () {
+                var bim = parseInt(seekToTime / 1000);
+                if (bim >= 0)
+                    myVideo.currentTime(bim);
+                myVideo.play();
+            });
+        }
+
+        function findVIdSeekTo() {
+            for (var i = 0; i < result.length; i++) {
+                if (moment(Date.now())/*.utcOffset('+1000')*/.isBetween(result[i]["startTime"], result[i]["endTime"])) {
+                    seekToTime = moment(Date.now()).utcOffset('+1000').diff(moment(result[i]["startTime"]));
+                    myVideoId = result[i]["videoId"];
+                    ext = result[i]["srcExtention"];
+                    srcUri = result[i]["srcUri"];
+                    console.log(seekToTime, 'in findVIdSeekTo()');
+                    console.log(myVideoId, 'in findVIdSeekTo()');
+                } else {
+                    if (moment(Date.now())/*.utcOffset('+1000')*/.isBefore(result[i]["startTime"])) {
+                        futureVideoList[futureVideoList.length] = moment(result[i]["startTime"]).diff(moment(Date.now())/*.utcOffset('+1000')*/);
+                    }
+                }
+            }
+            //console.log(Math.round(futureVideoList[0] / 60000));
+            //remainTimeToNextVideo = futureVideoList[0];
+            //console.log(remainTimeToNextVideo)
+            console.log('here in findfideoidseekto');
+        }
+
+        function findVideoAndSeekTo(item, index) {
+            if (moment(Date.now())/*.utcOffset('+1000')*/.isBetween(item["startTime"], item["endTime"])) {
+                seekToTime = moment(Date.now())/*.utcOffset('+1000')*/.diff(moment(item["startTime"]));
+                myVideoId = item["videoId"];
+                console.log(seekToTime, 'in function in if isbetween');
+                console.log(myVideoId, 'in function in if isbetween');
+            }
+            if (myVideoId == undefined) {
+                if (moment(Date.now())/*.utcOffset('+1000')*/.isBefore(item["startTime"])) {
+                    futureVideoList.push(moment(item["startTime"]).diff(moment(Date.now())/*.utcOffset('+1000')*/));
+                }
+            }
+        }
+    </script>
+
+
+</body>
+</html>

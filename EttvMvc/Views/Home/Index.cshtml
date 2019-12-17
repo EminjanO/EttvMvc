@@ -1,0 +1,126 @@
+﻿@model IEnumerable<EttvMvc.Models.ChannelProgram>
+@{
+    ViewBag.Title = "Index";
+    Layout = "~/Views/Shared/_EttvLayout.cshtml";
+}
+
+<section class="tabs">
+    <div class="cntnr">
+        <div id="tab-1" class="tab-item tab-border">
+            <i class="fas fa-door-open fa-3x"></i>
+            <p class="hide-sm">East-Turkistan Television</p>
+        </div>
+        <div id="tab-2" class="tab-item">
+            <i class="fas fa-tablet-alt fa-3x"></i>
+            <p class="hide-sm">Watch anywhere</p>
+        </div>
+        <div id="tab-3" class="tab-item">
+            <i class="fas fa-tags fa-3x"></i>
+            <p class="hide-sm">Check your Program</p>
+        </div>
+    </div>
+</section>
+
+<section class="tabb-content">
+    <div class="cntnr">
+        <!-- Tab Content 1 -->
+        <div id="tab-1-content" class="tabb-content-item show">
+            <div class="tab-1-content-inner">
+                <div>
+                    <p class="text-lg">
+                        Watch your TV program All Around The World in your timezone !
+                    </p>
+                </div>
+                <img src="@Url.Content("~/Content/EttvTemplate/")img/world_with_tibet.jpg" alt="" />
+            </div>
+        </div>
+
+        <!-- Tab Content 2 -->
+        <div id="tab-2-content" class="tabb-content-item">
+            <div class="tab-2-content-top">
+                <p class="text-lg">
+                    Watch TV anywhere — personalized for
+                    you.
+                </p>
+            </div>
+            <div class="tab-2-content-bottom">
+                <div>
+                    <img src="@Url.Content("~/Content/EttvTemplate/")img/tabb-content-2-1.png" alt="" />
+                    <p class="text-md">
+                        Watch on your TV
+                    </p>
+                    <p class="text-dark">
+                        Smart TVs, PlayStation, Xbox, Chromecast, Apple TV, Blu-ray
+                        players and more.
+                    </p>
+                </div>
+                <div>
+                    <img src="@Url.Content("~/Content/EttvTemplate/")img/tabb-content-2-2.png" alt="" />
+                    <p class="text-md">
+                        Watch instantly or download for later
+                    </p>
+                    <p class="text-dark">
+                        Available on phone and tablet, wherever you go.
+                    </p>
+                </div>
+                <div>
+                    <img src="@Url.Content("~/Content/EttvTemplate/")img/tabb-content-2-3.png" alt="" />
+                    <p class="text-md">
+                        Use any computer
+                    </p>
+                    <p class="text-dark">
+                        Watch right on Netflix.com.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Content 3 -->
+        <div id="tab-3-content" class="tabb-content-item">
+            <div class="text-center">
+                <p class="text-lg">
+                    Program list is here. Follow your Program in ETTV.
+                </p>
+            </div>
+
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>program</th>
+                        <th>time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        if (item.StartTime.Date == ViewBag.myDatetimeBag.Date)
+                        {
+                            <tr>
+                                <td>@item.VideoContent.Title</td>
+                                <td>@item.StartTime.ToString("HH:mm") - @item.EndTime.ToString("HH:mm")</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+@section Scripts{
+    <script>
+        $(function() {
+            $.ajax({
+                type: "POST",
+                url: '@Url.Action("Index", "Home")',
+                dataType: 'json',
+                data: '{now:' + Date.now() + '}',
+                contentType: "application/json; charset=utf-8",
+                success: function(data) {
+                    console.log(data, "from home index, Todays Program list");
+                }
+            });
+        });
+    </script>
+}
+
